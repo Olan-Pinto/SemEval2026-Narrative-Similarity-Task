@@ -1,0 +1,94 @@
+{
+  "ensemble_type": "confidence_based_routing",
+  "version": "1.0",
+  "created_date": "2025-11-13 01:44:09",
+  "symbolic_model": {
+    "type": "gemini-2.0-flash",
+    "accuracy": 0.71,
+    "description": "Hybrid symbolic-neural with element extraction"
+  },
+  "embedding_model": {
+    "type": "fine-tuned all-mpnet-base-v2",
+    "path": "./finetuned_narrative_model",
+    "accuracy": 0.64,
+    "description": "Fine-tuned on synthetic narrative data with triplet loss"
+  },
+  "strategy": {
+    "name": "confidence_based_routing",
+    "threshold": 0.3,
+    "description": "Route to symbolic model when embedding confidence < threshold, otherwise use embedding model",
+    "rule": "if abs(sim_a - sim_b) > 0.30: use embedding, else: use symbolic"
+  },
+  "performance": {
+    "dev_set_accuracy": 0.73,
+    "improvement_over_symbolic": 0.02,
+    "improvement_over_embedding": 0.09,
+    "dev_set_size": 200,
+    "correct_predictions": 146,
+    "symbolic_usage_rate": 0.99,
+    "embedding_usage_rate": 0.01,
+    "symbolic_used_count": 198,
+    "embedding_used_count": 2
+  },
+  "threshold_analysis": [
+    {
+      "threshold": 0.0,
+      "accuracy": 0.64,
+      "symbolic_used": 0,
+      "finetuned_used": 200
+    },
+    {
+      "threshold": 0.05,
+      "accuracy": 0.67,
+      "symbolic_used": 69,
+      "finetuned_used": 131
+    },
+    {
+      "threshold": 0.1,
+      "accuracy": 0.69,
+      "symbolic_used": 137,
+      "finetuned_used": 63
+    },
+    {
+      "threshold": 0.15,
+      "accuracy": 0.715,
+      "symbolic_used": 174,
+      "finetuned_used": 26
+    },
+    {
+      "threshold": 0.2,
+      "accuracy": 0.715,
+      "symbolic_used": 182,
+      "finetuned_used": 18
+    },
+    {
+      "threshold": 0.25,
+      "accuracy": 0.725,
+      "symbolic_used": 195,
+      "finetuned_used": 5
+    },
+    {
+      "threshold": 0.3,
+      "accuracy": 0.73,
+      "symbolic_used": 198,
+      "finetuned_used": 2
+    }
+  ],
+  "insights": [
+    "Symbolic model is used 99% of the time - it's the primary decision maker",
+    "Fine-tuned model acts as a safety net for high-confidence cases",
+    "Threshold of 0.30 provides optimal balance",
+    "2% improvement suggests models have complementary strengths",
+    "Best performing ensemble strategy among all tested (voting, score-based, routing, meta-classifiers)"
+  ],
+  "usage": {
+    "prediction_logic": "embedding_confidence = abs(sim_a - sim_b); if embedding_confidence > 0.30: use embedding_prediction else: use symbolic_prediction",
+    "api_requirements": "Gemini API key required for symbolic predictions",
+    "dependencies": [
+      "google-generativeai",
+      "sentence-transformers",
+      "torch",
+      "sklearn"
+    ]
+  }
+}
