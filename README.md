@@ -110,7 +110,45 @@ Provide extracted elements to LLM for systematic comparison on three dimensions:
 
 ---
 
-### 5. Ensemble Approach (Best Model)
+### 5. Improved Event-Chain Model
+
+**Location:** Code/event_chain_model_improved.ipynb
+
+**Approach:** A hybrid narrative similarity method combining embedding-based similarity with structured event reasoning.
+
+**Components:**
+- **Theme Similarity:** SBERT cosine similarity between anchor and continuation.
+- **Event Extraction:** LLM extracts structured events (subject, verb, object) from each text.
+- **Event-Chain Alignment:** Uses the Hungarian algorithm to optimally align event sequences based on semantic similarity.
+- **Outcome Similarity:** LLM-generated outcome summaries embedded with SBERT.
+- **Weighted Fusion:** Final similarity score is a weighted combination of theme, event, ordering, and outcome components.
+
+**Results:** 65.00% accuracy on a 20-sample development subset.
+
+**Insight:** Event-structure alignment offers meaningful narrative comparisons, but relies heavily on LLM event extraction quality and weight tuning.
+
+---
+
+### 6. HuggingFace Pairwise Ranking Model 
+
+**Location:** Code/hf_pairwise_ranking.ipynb
+
+**Approach:** A supervised pairwise ranking model using HuggingFace Transformers.  
+Each (anchor, A, B) triple is converted into two labeled examples:
+
+- `(anchor, A)` → label = 1 if A is closer  
+- `(anchor, B)` → label = 1 if B is closer
+
+A transformer-based sequence classification model (e.g., RoBERTa) is fine-tuned to score the plausibility of each continuation.  
+Final prediction is determined by comparing:
+
+
+**Results:** 62.50% validation accuracy after 5 epochs of training.
+
+**Insight:** A clean, discriminative baseline with stable confidence margins that performs competitively without LLM prompting or symbolic reasoning.
+
+
+### 7. Ensemble Approach (Best Model)
 
 **Location:** [Code/ensemble_approach.ipynb](Code/ensemble_approach.ipynb)
 
@@ -150,7 +188,7 @@ else:
 
 ---
 
-### 6. Synthetic Data Generation
+### 8. Synthetic Data Generation
 
 **Location:** [Code/synthetic_data_generation.ipynb](Code/synthetic_data_generation.ipynb)
 
@@ -197,6 +235,8 @@ else:
 │   ├── ensemble_approach.ipynb           # Ensemble methods (best model)
 │   ├── synthetic_data_generation.ipynb   # Generate training data
 │   └── ensemble_model_saver.py           # Save ensemble configuration
+│   └── roberta_pairwise_ranking.ipynb    # HuggingFace pairwise ranking model
+│   └── event-chain-model-improved.ipynb  # Improved event-chain alignment model
 ├── Data/
 │   ├── SemEval2026-Task_4-sample-v1/     # 39 sample examples
 │   └── SemEval2026-Task_4-dev-v1/        # 200 development examples
@@ -255,6 +295,9 @@ pip install google-generativeai pandas numpy scikit-learn sentence-transformers 
 | Baseline MPNET | Embedding | 61.50% | 123/200 | Fast, no training needed | Lexical similarity bias |
 | Baseline MiniLM | Embedding | 55.00% | 110/200 | Smallest model size | Poor narrative understanding |
 | Longformer | Embedding | 46.50% | 93/200 | Long context handling | Not optimized for similarity |
+| Improved Event-Chain Model | Hybrid | 65.00% | 13/20 | Captures event-level narrative structure | Dependent on LLM event extraction quality |
+| RoBERTa Pairwise Ranking Model | Supervised | 62.50% | 25/40 | Strong discriminative baseline with stable margins | Requires training + limited by validation set size |
+
 
 ### Error Analysis
 
