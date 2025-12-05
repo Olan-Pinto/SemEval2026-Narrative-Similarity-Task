@@ -150,7 +150,46 @@ else:
 
 ---
 
-### 6. Synthetic Data Generation
+### 6. Chain-of-Thought Reasoning
+
+**Location:** [Code/chain_of_thought_reasoning.ipynb](Code/chain_of_thought_reasoning.ipynb)
+
+**Approach:** Enhanced hybrid symbolic-neural approach with explicit step-by-step reasoning.
+
+**Key Innovation:**
+Instead of directly comparing stories, the LLM is prompted to:
+1. Extract narrative elements with reasoning explanations
+2. Compare each dimension (themes, events, outcomes, conflict) separately
+3. Score each comparison on a 0-10 scale with justification
+4. Aggregate scores and explain the final decision
+
+**Reasoning Process:**
+```
+Step 1: Compare Themes → Score A: 8/10, Score B: 5/10
+Step 2: Compare Event Sequences → Score A: 7/10, Score B: 6/10
+Step 3: Compare Outcomes → Score A: 6/10, Score B: 8/10
+Step 4: Compare Conflict Types → Score A: 9/10, Score B: 4/10
+Step 5: Final Decision → Total A: 30, Total B: 23 → Choose A
+```
+
+**Expected Results:** 72-74% accuracy (1-3% improvement over hybrid symbolic-neural)
+
+**Benefits:**
+- More systematic and consistent decisions
+- Explicit scoring reduces ambiguity
+- Fully interpretable - can trace every decision
+- Better handling of edge cases through structured reasoning
+
+**Trade-offs:**
+- Slower inference (4 API calls per triplet vs 3)
+- Higher API costs (~30% more)
+- Longer prompts
+
+This approach demonstrates advanced prompting techniques and represents a natural evolution of the symbolic reasoning approach.
+
+---
+
+### 7. Synthetic Data Generation
 
 **Location:** [Code/synthetic_data_generation.ipynb](Code/synthetic_data_generation.ipynb)
 
@@ -194,6 +233,7 @@ else:
 │   ├── few_shot_prompting.ipynb          # LLM prompting experiments
 │   ├── fine_tuning.ipynb                 # Fine-tuning with triplet loss
 │   ├── hybrid_symbolic_neural.ipynb      # Symbolic extraction + reasoning
+│   ├── chain_of_thought_reasoning.ipynb  # Chain-of-Thought reasoning 
 │   ├── ensemble_approach.ipynb           # Ensemble methods (best model)
 │   ├── synthetic_data_generation.ipynb   # Generate training data
 │   └── ensemble_model_saver.py           # Save ensemble configuration
@@ -201,8 +241,6 @@ else:
 │   ├── SemEval2026-Task_4-sample-v1/     # 39 sample examples
 │   └── SemEval2026-Task_4-dev-v1/        # 200 development examples
 ├── finetuned_narrative_model/            # Fine-tuned model checkpoint
-├── IMPROVEMENT_APPROACHES.md             # Detailed improvement strategies
-├── ENSEMBLE_SETUP_GUIDE.md              # Setup guide for ensemble
 └── README.md                             # This file
 ```
 
@@ -227,7 +265,6 @@ pip install google-generativeai pandas numpy scikit-learn sentence-transformers 
    - Set up Gemini API key in `Code/ensemble_approach.ipynb`
    - Ensure fine-tuned model exists in `finetuned_narrative_model/`
    - Run all cells to get 73% accuracy
-   - See [ENSEMBLE_SETUP_GUIDE.md](ENSEMBLE_SETUP_GUIDE.md) for detailed instructions
 
 3. **Generate synthetic data:**
    ```bash
@@ -282,7 +319,6 @@ pip install google-generativeai pandas numpy scikit-learn sentence-transformers 
 
 ## Future Improvements
 
-See [IMPROVEMENT_APPROACHES.md](IMPROVEMENT_APPROACHES.md) for detailed strategies. Top priorities:
 
 ### Phase 1: Quick Wins (Week 1-2)
 1. **Upgrade LLM** - Test Gemini 2.0 Pro or Claude 3.5 Sonnet (+2-5% expected)
