@@ -2,362 +2,243 @@
 
 **SemEval 2026 Task 4: Narrative Story Similarity and Narrative Representation Learning**
 
-## Overview
+## What This Task Is About
 
-The Narrative Similarity Task invites participants to build systems that understand and model *narrative similarity*. The goal is to measure how similar two stories are in terms of theme, course of action, outcomes, etc.
+This competition asks participants to build systems that can understand how similar two stories are, not just in terms of the words they use, but in their deeper narrative structure. We're talking about things like theme, plot progression, character arcs, and how the story resolves.
 
-There are **two tracks**:
+There are two tracks:
 
-* **Track A**: Given a triple (anchor story, choice A, choice B), decide which choice is **more narratively similar** to the anchor.
-* **Track B**: Produce vector embeddings for stories such that cosine similarity correlates with narrative similarity judgments.
+* **Track A**: You're given three stories - an anchor and two choices. Your job is to figure out which of the two choices is more similar to the anchor in terms of narrative.
+* **Track B**: Create embeddings for stories where the distance between embeddings reflects how narratively similar they are.
 
----
-
-## Our Implementation
-
-This repository contains our implementation for **Track A**, exploring multiple approaches from baseline embedding models to advanced hybrid symbolic-neural systems and ensemble methods.
-
-### Performance Summary
-
-| Approach | Accuracy | Improvement | Description |
-|----------|----------|-------------|-------------|
-| **Ensemble (Confidence-based Routing)** | **73.00%** | **+11.50%** | Best approach - combines symbolic and embedding models |
-| **Hybrid Symbolic-Neural** | **71.00%** | **+9.50%** | LLM-based symbolic feature extraction with structured reasoning |
-| Fine-tuned all-mpnet-base-v2 | 64.00% | +2.50% | Triplet loss fine-tuning on 6,773 synthetic examples |
-| 0-shot LLM (Gemini 2.0 Flash) | 63.50% | +2.00% | Pure prompting without feature extraction |
-| Few-shot LLM (Gemini 2.0 Flash) | 61.50% | 0.00% | 3-shot prompting with examples |
-| Baseline (all-mpnet-base-v2) | 61.50% | *baseline* | Pre-trained sentence embeddings |
-| Baseline (all-MiniLM-L6-v2) | 55.00% | -6.50% | Smaller pre-trained model |
-| Baseline (Longformer) | 46.50% | -15.00% | Long-context model (failed approach) |
-
-**Key Achievement:** 73.00% accuracy with ensemble approach - a **19.2% relative improvement** over the best baseline.
+We focused on **Track A** for this work.
 
 ---
 
-## Approaches Implemented
+## What We Built
 
-### 1. Baseline Similarity Models
+We tried out a bunch of different approaches to solve this problem. Our best model hits **73% accuracy** on the development set, which is about 19% better than the baseline. Here's how all our approaches stacked up:
 
-**Location:** [Code/baseline_similarity.ipynb](Code/baseline_similarity.ipynb)
-
-**Approach:** Use pre-trained sentence embedding models to encode stories and compare using cosine similarity.
-
-**Models Tested:**
-- `all-MiniLM-L6-v2`: 55.00% accuracy
-- `all-mpnet-base-v2`: 61.50% accuracy (best baseline)
-- `allenai/longformer-base-4096`: 46.50% accuracy
-
-**Key Insight:** Standard embedding models capture lexical similarity better than narrative similarity, highlighting the need for specialized approaches.
-
----
-
-### 2. Few-Shot LLM Prompting
-
-**Location:** [Code/few_shot_prompting.ipynb](Code/few_shot_prompting.ipynb)
-
-**Approach:** Prompt Gemini 2.0 Flash with 3 example triplets to guide narrative similarity judgments.
-
-**Results:** 61.50% accuracy
-
-**Insight:** Simple prompting matches baseline embeddings but doesn't exceed them - narrative similarity requires more structured reasoning.
+| Approach | Accuracy | Key Idea |
+|----------|----------|----------|
+| **Ensemble (Best Model)** | **73.00%** | Combines symbolic reasoning with embeddings, routing between them based on confidence |
+| **Hybrid Symbolic-Neural** | **71.00%** | Uses an LLM to extract story elements (themes, events, outcomes) then compares them |
+| Fine-tuned Sentence Transformer | 64.00% | Trained a standard embedding model on synthetic story data |
+| Zero-shot LLM | 63.50% | Just asked Gemini to compare stories directly |
+| Few-shot LLM | 61.50% | Same as above but gave it 3 examples first |
+| Baseline Embeddings | 61.50% | Off-the-shelf sentence embeddings with no training |
+| Event-Chain Model | 57.00% | Extracted event sequences and aligned them optimally |
+| RoBERTa Pairwise Ranking | 62.50% | Fine-tuned a large transformer to rank story pairs |
+| Chain-of-Thought | 40.00% | Step-by-step reasoning (didn't work well) |
 
 ---
 
-### 3. Fine-Tuned Embedding Model
+## The Approaches We Tried
 
-**Location:** [Code/fine_tuning.ipynb](Code/fine_tuning.ipynb)
+### 1. Baseline: Off-the-Shelf Embeddings
 
-**Approach:**
-- Generated 6,773 synthetic training examples using multiple LLMs
-- Fine-tuned `all-mpnet-base-v2` with triplet loss
-- Optimized with low learning rate (5e-6) and contrastive learning
+**Code:** [Code/baseline_similarity.ipynb](Code/baseline_similarity.ipynb)
 
-**Configuration:**
-- Base model: `sentence-transformers/all-mpnet-base-v2`
-- Loss: Triplet loss with cosine distance, margin=-0.4
-- Training: 1 epoch, batch size 8, 100 warmup steps
-- Data: 1,897 contrastive examples + 4,973 classification examples
+We started by testing whether standard sentence embedding models could handle this task. These models convert text into vectors, and you compare vectors using cosine similarity to see how similar two pieces of text are.
 
-**Results:** 64.00% accuracy (+2.50% improvement over baseline)
+We tested three models:
+- `all-MiniLM-L6-v2`: Got 55% accuracy
+- `all-mpnet-base-v2`: Got 61.5% accuracy (our baseline)
+- Longformer: Got 46.5% accuracy
 
-**Model Location:** [finetuned_narrative_model/](finetuned_narrative_model/)
+**What we learned:** These models are pretty good at finding stories that use similar words, but they miss the deeper narrative structure. A story about redemption could use totally different words than another redemption story, and these models wouldn't catch that.
 
 ---
 
-### 4. Hybrid Symbolic-Neural
+### 2. Asking an LLM Directly
 
-**Location:** [Code/hybrid_symbolic_neural.ipynb](Code/hybrid_symbolic_neural.ipynb)
+**Code:** [Code/few_shot_prompting.ipynb](Code/few_shot_prompting.ipynb)
 
-**Approach:** Two-stage process combining symbolic extraction with neural reasoning:
+We tried just asking Gemini to compare stories for us. We tested two versions:
+- **Zero-shot:** Just ask the model with no examples → 63.5% accuracy
+- **Few-shot:** Give it 3 examples first, then ask → 61.5% accuracy
 
-**Stage 1 - Symbolic Element Extraction:**
-Use Gemini 2.0 Flash to extract narrative elements from each story:
-- Abstract themes (core ideas, motifs, moral lessons)
-- Key events (chronological sequence)
-- Outcomes (final results/resolutions)
-- Character arcs (character changes)
-- Conflict type (nature of central conflict)
+Interestingly, giving examples actually made it slightly worse. We think this is because narrative similarity is complex enough that a few examples don't really help guide the model.
 
-**Stage 2 - Structured Comparison:**
-Provide extracted elements to LLM for systematic comparison on three dimensions:
-1. Theme similarity
-2. Event sequence similarity
-3. Outcome similarity
-
-**Results:** 71.00% accuracy (+9.50% improvement)
-
-**Key Breakthrough:** Structured symbolic reasoning significantly outperforms pure embedding or prompting approaches.
+**What we learned:** LLMs understand narrative better than embeddings, but you can't just throw the problem at them and expect great results.
 
 ---
 
-### 5. Improved Event-Chain Model
+### 3. Training Our Own Embedding Model
 
-**Location:** Code/event_chain_model_improved.ipynb
+**Code:** [Code/fine_tuning.ipynb](Code/fine_tuning.ipynb)
 
-**Approach:** A hybrid narrative similarity method combining embedding-based similarity with structured event reasoning.
+We took the baseline embedding model and fine-tuned it on about 6,773 synthetic story examples that we generated. We used triplet loss, which teaches the model that similar stories should have close embeddings and dissimilar ones should be far apart.
 
-**Components:**
-- **Theme Similarity:** SBERT cosine similarity between anchor and continuation.
-- **Event Extraction:** LLM extracts structured events (subject, verb, object) from each text.
-- **Event-Chain Alignment:** Uses the Hungarian algorithm to optimally align event sequences based on semantic similarity.
-- **Outcome Similarity:** LLM-generated outcome summaries embedded with SBERT.
-- **Weighted Fusion:** Final similarity score is a weighted combination of theme, event, ordering, and outcome components.
+Training details:
+- Started with `all-mpnet-base-v2`
+- Used a very low learning rate (5e-6) to avoid messing up what it already knows
+- Trained for just 1 epoch with batches of 8 examples
 
-**Results:** 65.00% accuracy on a 20-sample development subset.
+**Results:** 64% accuracy (about 2.5 points better than baseline)
 
-**Insight:** Event-structure alignment offers meaningful narrative comparisons, but relies heavily on LLM event extraction quality and weight tuning.
+**What we learned:** Fine-tuning helps, but not by much. The task needs more than just better embeddings.
 
----
-
-### 6. HuggingFace Pairwise Ranking Model 
-
-**Location:** Code/hf_pairwise_ranking.ipynb
-
-**Approach:** A supervised pairwise ranking model using HuggingFace Transformers.  
-Each (anchor, A, B) triple is converted into two labeled examples:
-
-- `(anchor, A)` → label = 1 if A is closer  
-- `(anchor, B)` → label = 1 if B is closer
-
-A transformer-based sequence classification model (e.g., RoBERTa) is fine-tuned to score the plausibility of each continuation.  
-Final prediction is determined by comparing:
-
-
-**Results:** 62.50% validation accuracy after 5 epochs of training.
-
-**Insight:** A clean, discriminative baseline with stable confidence margins that performs competitively without LLM prompting or symbolic reasoning.
-
-
-### 7. Ensemble Approach (Best Model)
-
-**Location:** [Code/ensemble_approach.ipynb](Code/ensemble_approach.ipynb)
-
-**Approach:** Combine the strengths of multiple models using confidence-based routing.
-
-**Component Models:**
-1. Hybrid Symbolic-Neural (71% accuracy)
-2. Fine-tuned all-mpnet-base-v2 (64% accuracy)
-
-**Ensemble Strategy: Confidence-based Routing**
-```python
-# Calculate embedding confidence
-embedding_confidence = abs(sim_a - sim_b)
-
-# Route based on confidence threshold
-if embedding_confidence > 0.30:
-    use embedding_prediction  # High confidence case
-else:
-    use symbolic_prediction   # Low confidence - defer to symbolic
-```
-
-**Results:** 73.00% accuracy (+2.00% over symbolic-only)
-
-**Analysis:**
-- Symbolic model used 99% of the time (198/200 cases)
-- Embedding model acts as safety net for high-confidence cases
-- Models complement each other: 43.5% disagreement rate
-- When models disagree, symbolic is correct 59.8% of the time
-
-**Other Strategies Tested:**
-- Simple voting (various weights): Up to 72.50%
-- Score-based combination: Up to 72.50%
-- Logistic regression meta-classifier: 62.50%
-- Gradient boosting meta-classifier: 65.00%
-
-**Configuration:** [Code/best_ensemble_config.json](Code/best_ensemble_config.json)
+**Model saved at:** [finetuned_narrative_model/](finetuned_narrative_model/)
 
 ---
 
-### 8. Synthetic Data Generation
+### 4. Hybrid Symbolic-Neural (Big Jump)
 
-**Location:** [Code/synthetic_data_generation.ipynb](Code/synthetic_data_generation.ipynb)
+**Code:** [Code/hybrid_symbolic_neural.ipynb](Code/hybrid_symbolic_neural.ipynb)
 
-**Approach:** Generate training data using Gemini 2.0 Flash to create diverse narrative similarity examples.
+This is where things got interesting. Instead of comparing stories directly, we broke down each story into its narrative components first, then compared those.
 
-**Our Generated Data:**
-- ~3,000 examples using **Gemini 2.0 Flash**
-- Generated in 3 batches (gemini_synthetic_data.jsonl, p2, p3)
-- Format: anchor_text, text_a, text_b, text_a_is_closer
+**How it works:**
+1. **Extract story elements** using Gemini:
+   - What are the main themes?
+   - What key events happen?
+   - How does it end?
+   - How do characters change?
+   - What kind of conflict is there?
 
-**Additional Pre-existing Data:**
-- 1,897 contrastive examples from multiple models (downloaded/provided)
-- Models in this dataset: GPT-4o, GPT-4o Mini, Claude 4 Sonnet, DeepSeek-V3, Llama, Qwen
-- Format: anchor_story, similar_story, dissimilar_story
+2. **Compare the elements** in a structured way:
+   - Do the stories share themes?
+   - Do similar events happen in both?
+   - Do they end similarly?
 
-**Total Training Data:** ~6,773 synthetic examples used for fine-tuning
+**Results:** 71% accuracy (9.5 points better than baseline)
 
-**Purpose:** Provide training data for fine-tuning embedding models with narrative-specific similarity patterns.
-
----
-
-## Key Insights
-
-1. **Symbolic reasoning outperforms embeddings:** Structured extraction of narrative elements (themes, events, outcomes) beats pure embedding similarity by 9.50%.
-
-2. **LLM-based approaches dominate:** All top approaches (73%, 71%, 64%, 63.5%) use LLMs in some form, while pure embeddings max out at 61.50%.
-
-3. **Ensemble gains are modest but consistent:** Combining models yields +2% improvement, suggesting complementary strengths.
-
-4. **Narrative ≠ Lexical similarity:** The poor performance of standard embeddings (55-61.5%) shows narrative similarity requires understanding abstract themes and causal structures.
-
-5. **Structured prompting is critical:** Providing symbolic features to the LLM (hybrid approach) dramatically improves over raw text prompting.
+**What we learned:** Breaking stories into their narrative building blocks before comparing them is way more effective than comparing the raw text. It's like comparing blueprints instead of looking at two houses and guessing if they were built the same way.
 
 ---
 
-## Repository Structure
+### 5. Event-Chain Model
 
-```
-├── Code/
-│   ├── baseline_similarity.ipynb          # Baseline embedding models
-│   ├── few_shot_prompting.ipynb          # LLM prompting experiments
-│   ├── fine_tuning.ipynb                 # Fine-tuning with triplet loss
-│   ├── hybrid_symbolic_neural.ipynb      # Symbolic extraction + reasoning
-│   ├── chain_of_thought_reasoning.ipynb  # Chain-of-Thought reasoning 
-│   ├── ensemble_approach.ipynb           # Ensemble methods (best model)
-│   ├── synthetic_data_generation.ipynb   # Generate training data
-│   └── ensemble_model_saver.py           # Save ensemble configuration
-│   └── roberta_pairwise_ranking.ipynb    # HuggingFace pairwise ranking model
-│   └── event-chain-model-improved.ipynb  # Improved event-chain alignment model
-├── Data/
-│   ├── SemEval2026-Task_4-sample-v1/     # 39 sample examples
-│   └── SemEval2026-Task_4-dev-v1/        # 200 development examples
-├── finetuned_narrative_model/            # Fine-tuned model checkpoint
-└── README.md                             # This file
-```
+**Code:** [Code/event-chain-model-improved.ipynb](Code/event-chain-model-improved.ipynb)
+
+We tried extracting the sequence of events from each story and then optimally aligning those sequences to see how similar they are.
+
+**How it works:**
+- Extract events (who did what to whom)
+- Use the Hungarian algorithm to match events between stories
+- Calculate how well event sequences align
+- Combine with theme and outcome similarity
+
+**Results:** 57% accuracy on full dev set, though with heavy tuning got 65% on a smaller set
+
+**What we learned:** Event alignment is a solid idea, but it's really sensitive to how well you extract events and how you weight different components. Small changes in the weights completely change performance.
 
 ---
 
-## Running the Code
+### 6. Fine-tuned RoBERTa
 
-### Prerequisites
+**Code:** [Code/roberta_pairwise_ranking.ipynb](Code/roberta_pairwise_ranking.ipynb)
 
-```bash
-pip install google-generativeai pandas numpy scikit-learn sentence-transformers torch transformers
-```
+We fine-tuned a large RoBERTa model to directly rank story pairs. Each training example is a story pair with a label saying whether they're similar or not.
 
-### Quick Start
+**How it works:**
+- Take each triplet and turn it into two pairs: (anchor, choice A) and (anchor, choice B)
+- Train RoBERTa to give higher scores to similar pairs
+- Pick whichever choice gets the higher score
 
-1. **Test baseline models:**
-   ```bash
-   jupyter notebook Code/baseline_similarity.ipynb
-   ```
+**Results:** 62.5% accuracy (best performance was after just 1 epoch, then it started overfitting)
 
-2. **Run best model (ensemble):**
-   - Set up Gemini API key in `Code/ensemble_approach.ipynb`
-   - Ensure fine-tuned model exists in `finetuned_narrative_model/`
-   - Run all cells to get 73% accuracy
-
-3. **Generate synthetic data:**
-   ```bash
-   jupyter notebook Code/synthetic_data_generation.ipynb
-   ```
-
-4. **Fine-tune your own model:**
-   ```bash
-   jupyter notebook Code/fine_tuning.ipynb
-   ```
+**What we learned:** Even a big model like RoBERTa struggles with this task when fine-tuned directly. The margins between scores were tiny, suggesting it wasn't learning strong distinctions.
 
 ---
 
-## Detailed Results Comparison
+### 7. Chain-of-Thought Reasoning
 
-### Model Performance Breakdown
+**Code:** [Code/chain_of_thought_reasoning.ipynb](Code/chain_of_thought_reasoning.ipynb)
 
-| Model | Type | Accuracy | Correct/Total | Key Strength | Key Weakness |
-|-------|------|----------|---------------|--------------|--------------|
-| Ensemble | Hybrid | **73.00%** | 146/200 | Combines symbolic reasoning with embedding confidence | Requires API calls + fine-tuned model |
-| Hybrid Symbolic-Neural | LLM-based | **71.00%** | 142/200 | Understands narrative structure | Slow inference (3 API calls/sample) |
-| Fine-tuned MPNET | Embedding | 64.00% | 128/200 | Fast inference, no API needed | Misses abstract narrative elements |
-| 0-shot Gemini | LLM-based | 63.50% | 127/200 | Simple setup | No structured reasoning |
-| Few-shot Gemini | LLM-based | 61.50% | 123/200 | Provides examples | Limited context learning |
-| Baseline MPNET | Embedding | 61.50% | 123/200 | Fast, no training needed | Lexical similarity bias |
-| Baseline MiniLM | Embedding | 55.00% | 110/200 | Smallest model size | Poor narrative understanding |
-| Longformer | Embedding | 46.50% | 93/200 | Long context handling | Not optimized for similarity |
-| Improved Event-Chain Model | Hybrid | 65.00% | 13/20 | Captures event-level narrative structure | Dependent on LLM event extraction quality |
-| RoBERTa Pairwise Ranking Model | Supervised | 62.50% | 25/40 | Strong discriminative baseline with stable margins | Requires training + limited by validation set size |
+We tried getting the LLM to show its work by scoring different aspects of narrative similarity step-by-step.
 
+**How it works:**
+- Extract story elements
+- Score theme overlap (0-10)
+- Score event similarity (0-10)
+- Score outcome similarity (0-10)
+- Score conflict type match (0-10)
+- Pick whichever choice has the higher total score
 
-### Error Analysis
+**Results:** 40% accuracy (worse than random guessing)
 
-**Cases where both models fail:** 20/200 (10%)
-- These are inherently difficult cases where narrative similarity is highly ambiguous
-
-**Model disagreement:** 87/200 (43.5%)
-- When models disagree:
-  - Symbolic approach correct: 52/87 (59.8%)
-  - Fine-tuned embedding correct: 35/87 (40.2%)
-- This suggests symbolic reasoning has better judgment on ambiguous cases
-
-### Computational Costs
-
-| Approach | Time (200 samples) | API Calls | Cost | GPU Required |
-|----------|-------------------|-----------|------|--------------|
-| Baseline | ~2 minutes | 0 | Free | No |
-| Fine-tuned | ~2 minutes | 0 | Free* | Optional |
-| Hybrid Symbolic | ~15 minutes | 600 | ~$1-2 | No |
-| Ensemble | ~15 minutes | 600 | ~$1-2 | Optional |
-
-*Fine-tuning initial training: ~20 minutes, requires GPU recommended
+**What we learned:** The model developed a strong bias toward choosing option B. When we looked at the scores, it was giving wildly different scores to very similar stories. This approach didn't work and we dropped it.
 
 ---
 
-## Future Improvements
+### 8. Ensemble - Our Best Model
 
+**Code:** [Code/ensemble_approach.ipynb](Code/ensemble_approach.ipynb)
 
-### Phase 1: Quick Wins (Week 1-2)
-1. **Upgrade LLM** - Test Gemini 2.0 Pro or Claude 3.5 Sonnet (+2-5% expected)
-2. **Enhanced Ensemble** - Test more sophisticated meta-classifiers (+1-2% expected)
-3. **Error analysis** - Systematically analyze and fix failure patterns (+2-4% expected)
+Our best result came from combining the hybrid symbolic-neural approach with the fine-tuned embeddings in a smart way.
 
-**Target:** 75-76% accuracy
+**How it works:**
+The embedding model calculates how similar each choice is to the anchor. If the difference between those similarities is large (confidence > 0.30), we trust the embedding model's choice. Otherwise, we defer to the symbolic model.
 
-### Phase 2: Refinement (Week 3-4)
-4. **Chain-of-Thought reasoning** - Add explicit step-by-step reasoning (+1-3% expected)
-5. **Feature engineering** - Extract comprehensive features for meta-classifier (+1-2% expected)
-6. **Targeted improvements** - Fix specific error categories (+2-3% expected)
+In practice, the symbolic model handles 99% of cases because the embedding model is rarely confident enough.
 
-**Target:** 77-78% accuracy
+**Why this works:**
+- The symbolic model is generally better (71% vs 64%)
+- But sometimes the embedding model catches things the symbolic model misses
+- They disagree about 43.5% of the time
+- When they disagree, symbolic is right about 60% of the time
 
-### Phase 3: Advanced (Week 5-8)
-7. **Multi-model synthetic data** - Generate diverse training data (+2-3% expected)
-8. **Test-time augmentation** - Multiple predictions with aggregation (+1-2% expected)
-9. **Graph-based representations** - Represent narratives as causal graphs (+2-3% expected)
+**Results:** 73% accuracy (2 points better than symbolic alone)
 
-**Target:** 77-80% accuracy
+We tried other ensemble methods too:
+- Simple voting: 72.5%
+- Score averaging: 72.5%
+- Logistic regression: 62.5%
+- Gradient boosting: 65%
+
+**What we learned:** Combining models helps, but only if you do it carefully. Simple averaging isn't as good as smart routing.
 
 ---
 
-## Task Details
+### 9. Generating Training Data
 
-### Track A
+**Code:** [Code/synthetic_data_generation.ipynb](Code/synthetic_data_generation.ipynb)
 
-* Input: JSONL objects containing:
-  * `anchor_text`
-  * `text_a`
-  * `text_b`
-  * `text_a_is_closer`
+Since we didn't have much labeled data, we generated our own using Gemini.
 
-Example:
+**How it works:**
+- Give Gemini a few examples of story triplets
+- Ask it to generate new ones with diverse themes, time periods, and genres
+- Keep the stories to 150-300 words
+- Make them sound like Wikipedia summaries
+
+**Results:** Generated about 1,000 examples successfully
+
+We combined these with another 1,897 examples generated by other LLMs (GPT-4, Claude, etc.) for a total of about 6,773 training examples.
+
+**What we learned:** LLM-generated training data is useful for fine-tuning, though you need to make sure it's diverse enough to be helpful.
+
+---
+
+## What We Learned Overall
+
+Here are the big takeaways from all this experimentation:
+
+**1. Narrative similarity is not word similarity**
+Standard embedding models max out around 61% because they look for similar words, not similar story structures. Two stories can tell the same narrative using completely different words.
+
+**2. Structure matters more than you'd think**
+Our best approaches all broke stories down into components (themes, events, outcomes) before comparing them. This structure-first approach beat everything else.
+
+**3. LLMs understand narrative, but you need to guide them**
+Just asking an LLM to compare stories gets 63.5%. Extracting structure first and then comparing gets 71%. The difference is in how you use the LLM.
+
+**4. Combining models helps, but not dramatically**
+Our ensemble only added 2 percentage points over the symbolic approach alone. Most of the gains come from picking the right approach, not from combining many approaches.
+
+**5. Some ideas don't work**
+Chain-of-thought reasoning flopped (40%), and large model fine-tuning barely beat baselines (62.5%). Not every sophisticated approach pays off.
+
+---
+
+## About the Competition
+
+### The Two Tracks
+
+**Track A** (what we worked on):
+You get three stories - one anchor and two choices. Your system needs to decide which choice is more narratively similar to the anchor. The data looks like this:
 
 ```json
 {
@@ -368,99 +249,48 @@ Example:
 }
 ```
 
-* Output: A decision on whether `text_a` is closer to the anchor than `text_b`.
-* Official Baseline: GPT‑4o‑mini prompting method
+The official baseline for this track uses GPT-4o-mini with basic prompting.
 
-### Track B
+**Track B**:
+Build an embedding model where the distance between story embeddings matches how similar humans think the stories are. Your embeddings need to be between 10 and 8192 dimensions, and they have to be generated independently for each story (no looking at pairs). The official baseline is SentenceBERT's `all-MiniLM-L6-v2`.
 
-* Input: Individual story texts
-* Output: Embeddings (10–8192 dimensions) generated *only* from the individual story
-* Goal: Cosine similarity between embeddings should match human similarity judgments
-* Official Baseline: SentenceBERT `all‑MiniLM‑L6‑v2`
+### The Data
 
----
+The competition provides about 1,000+ annotated story triplets, all sourced from Wikipedia:
+- **Sample set**: 39 examples with labels
+- **Dev set**: 200 examples with labels (this is what we used for testing)
+- **Test set**: 400 triplets + 849 individual stories (labels released after evaluation)
+- **Official synthetic set**: 1,900 LLM-generated triplets for training
 
-## Data
+We also created our own synthetic training data - about 6,773 examples generated using various LLMs.
 
-### Composition
+All data is licensed under CC-BY-SA-4.0.
 
-* **1,000+ annotated triples** (stories from Wikipedia)
-* **Sample set**: 39 items (with labels)
-* **Development set**: 200 items (with labels)
-* **Synthetic training set**: 1,900 LLM‑generated triples (official)
-* **Our synthetic data**: 6,773 examples from multiple LLMs
-* **Test set**: 400 triples + 849 individual stories (labels released after evaluation)
+### What Makes This Task Hard
 
-### Formats
+Narrative similarity isn't about using the same words or phrases. Two stories can be narratively similar while using completely different vocabulary. For example:
+- A story about a fisherman finding peace at sea
+- A story about a programmer finding peace through meditation
 
-**Track A format:**
+These might share the same narrative arc (journey → struggle → inner peace) but have totally different settings, characters, and word choices. Standard text similarity models fail at this because they look for lexical overlap.
 
-```json
-{
-  "anchor_text": "...",
-  "text_a": "...",
-  "text_b": "...",
-  "text_a_is_closer": true
-}
-```
+### Why It Matters
 
-**Track B format:**
-
-```json
-{
-  "text": "This is the story."
-}
-```
-
-**License:** CC‑BY‑SA‑4.0
-
----
-
-## Submission & Evaluation
-
-Your submission must be a ZIP containing:
-
-```
-track_a.jsonl
-track_b.{npy|jsonl}
-```
-
-The leaderboard requires declaring:
-
-1. Which track(s) you're entering
-2. The type of method used
-
-### Rules
-
-* Track B embeddings must be produced **independently per story** (no pairwise inference)
-* Embedding length must be **10–8192 dimensions**
-
----
-
-## Why This Task Matters
-
-Narrative similarity is a key dimension of understanding stories beyond surface lexical similarity. Systems developed for this task can improve story retrieval, thematic clustering, summarization, creative writing tools, and narrative analytics.
-
----
-
-## Citation
-
-If you use this code or approach, please cite:
-
-```
-SemEval 2026 Task 4: Narrative Story Similarity and Narrative Representation Learning
-https://narrative-similarity-task.github.io/
-```
+Better narrative similarity systems could help with:
+- Finding stories with similar themes in large databases
+- Recommending books or movies based on narrative structure
+- Helping writers understand story patterns
+- Analyzing how stories evolve across cultures or time periods
 
 ---
 
 ## More Information
 
-Visit the official site for updates and full guidelines:
+Check out the official competition page for full details and updates:
 [https://narrative-similarity-task.github.io/](https://narrative-similarity-task.github.io/)
 
----
-
-**Last Updated:** 2025-11-26
-**Best Model:** Ensemble (Confidence-based Routing) - 73.00% accuracy
-**Status:** Ready for test set evaluation
+If you use this work, cite:
+```
+SemEval 2026 Task 4: Narrative Story Similarity and Narrative Representation Learning
+https://narrative-similarity-task.github.io/
+```
